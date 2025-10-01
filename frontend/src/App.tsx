@@ -7,12 +7,12 @@ import {
 } from "react-admin";
 import { Layout } from "./Layout";
 import { dataProvider } from "./dataProvider";
-import {listarReporte} from "./reportes"
+import {listarReporte, crearReporte, editarReporte} from "./reportes"
 export const App = () => (
   <Admin layout={Layout} dataProvider={dataProvider}>
     <Resource
       name="reportes"
-      list={listarReporte}
+      list={listarReporte} create={crearReporte} edit={editarReporte}
     />
   </Admin>
 );
