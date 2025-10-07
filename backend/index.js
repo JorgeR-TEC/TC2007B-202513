@@ -3,7 +3,7 @@ const MongoClient=require("mongodb").MongoClient;
 var cors=require("cors");
 const bodyParser=require("body-parser");
 const argon2=require("argon2")
-
+const jwt=require("jsonwebtoken")
 
 const app=express();
 app.use(cors());
@@ -11,7 +11,21 @@ const PORT=3000;
 let db;
 app.use(bodyParser.json());
 
+
+async function log(sujeto, objeto, accion){
+	toLog={};
+	toLog["timestamp"]=new Date();
+	toLog["sujeto"]=sujeto;
+	toLog["objeto"]=objeto;
+	toLog["accion"]=accion;
+	await db.collection("log402").insertOne(toLog);
+}
+
 app.get("/reportes", async (req,res)=>{
+	try{
+	let token=req.get("Authentication");
+	let verifiedToken=await jwt.verify(token, "secretKey");
+	let user=verifiedToken.usuario;	
 	if("_sort" in req.query){//getList
 		let sortBy=req.query._sort;
 		let sortOrder=req.query._order=="ASC"?1:-1;
@@ -23,6 +37,7 @@ app.get("/reportes", async (req,res)=>{
 		res.set("Access-Control-Expose-Headers", "X-Total-Count");
 		res.set("X-Total-Count", data.length);
 		data=data.slice(inicio,fin)
+		log(user, "reportes", "leer");
 		res.json(data)
 	}else if("id" in req.query){
 		let data=[];
@@ -36,6 +51,9 @@ app.get("/reportes", async (req,res)=>{
 		res.set("Access-Control-Expose-Headers", "X-Total-Count");
 		res.set("X-Total-Count", data.length);
 		res.json(data);
+	}
+	}catch{
+		res.sendStatus(401);
 	}
 });
 
@@ -92,6 +110,21 @@ app.post("/registrarse", async(req, res)=>{
 		res.sendStatus(403)
 	}
 })
+
+app.post("/login", async (req, res)=>{
+	let user=req.body.username;
+	let pass=req.body.password;
+	let data=await db.collection("usuarios402").findOne({"usuario":user});
+	if(data==null){
+		res.sendStatus(401);
+	}else if(await argon2.verify(data.password, pass)){
+		let token=jwt.sign({"usuario":data.usuario}, "secretKey", {expiresIn: 900})
+		res.json({"token":token, "id":data.usuario, "nombre":data.nombre})
+	}else{
+		res.sendStatus(401);
+	}
+})
+
 app.listen(PORT, ()=>{
 	connectToDB();
 	console.log("aplicacion corriendo en puerto 3000");

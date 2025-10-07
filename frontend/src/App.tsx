@@ -4,9 +4,10 @@ import { dataProvider } from "./dataProvider";
 import {listarReporte, crearReporte, editarReporte} from "./reportes"
 import {Route} from "react-router-dom"
 import Registrarse from "./registrarse";
+import authProvider from "./AuthProvider"
 
 export const App = () => (
-  <Admin layout={Layout} dataProvider={dataProvider}>
+  <Admin layout={Layout} dataProvider={dataProvider} authProvider={authProvider}>
     <Resource
       name="reportes"
       list={listarReporte} create={crearReporte} edit={editarReporte}
