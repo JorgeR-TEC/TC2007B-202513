@@ -4,6 +4,8 @@ var cors=require("cors");
 const bodyParser=require("body-parser");
 const argon2=require("argon2")
 const jwt=require("jsonwebtoken")
+const fs=require("fs");
+const https = require('https');
 
 const app=express();
 app.use(cors());
@@ -18,13 +20,13 @@ async function log(sujeto, objeto, accion){
 	toLog["sujeto"]=sujeto;
 	toLog["objeto"]=objeto;
 	toLog["accion"]=accion;
-	await db.collection("log402").insertOne(toLog);
+	await db.collection("log").insertOne(toLog);
 }
 
 app.get("/reportes", async (req,res)=>{
 	try{
 	let token=req.get("Authentication");
-	let verifiedToken=await jwt.verify(token, "secretKey");
+	let verifiedToken=await jwt.verify(token, await process.env.JWTKEY);
 	let user=verifiedToken.usuario;	
 	if("_sort" in req.query){//getList
 		let sortBy=req.query._sort;
@@ -33,7 +35,7 @@ app.get("/reportes", async (req,res)=>{
 		let fin=Number(req.query._end);
 		let sorter={}
 		sorter[sortBy]=sortOrder;
-		let data= await db.collection("ejemplo402").find({}).sort(sorter).project({_id:0}).toArray();
+		let data= await db.collection("reportes").find({}).sort(sorter).project({_id:0}).toArray();
 		res.set("Access-Control-Expose-Headers", "X-Total-Count");
 		res.set("X-Total-Count", data.length);
 		data=data.slice(inicio,fin)
@@ -42,12 +44,12 @@ app.get("/reportes", async (req,res)=>{
 	}else if("id" in req.query){
 		let data=[];
 		for(let index=0; index<req.query.id.length; index++){
-			let dataParcial=await db.collection("ejemplo402").find({id: Number(req.query.id[index])}.project({_id:0}).toArray())
+			let dataParcial=await db.collection("reportes").find({id: Number(req.query.id[index])}.project({_id:0}).toArray())
 			data= await data.concat(dataParcial);
 		}
 		res.json(data);
 	}else{
-		let data=await db.collection("ejemplo402").find(req.query).project({_id:0}).toArray();
+		let data=await db.collection("reportes").find(req.query).project({_id:0}).toArray();
 		res.set("Access-Control-Expose-Headers", "X-Total-Count");
 		res.set("X-Total-Count", data.length);
 		res.json(data);
@@ -60,7 +62,7 @@ app.get("/reportes", async (req,res)=>{
 //getOne
 
 app.get("/reportes/:id", async (req,res)=>{
-	let data=await db.collection("ejemplo402").find({"id": Number(req.params.id)}).project({_id:0}).toArray();
+	let data=await db.collection("reportes").find({"id": Number(req.params.id)}).project({_id:0}).toArray();
 	res.json(data[0]);
 });
 
@@ -68,13 +70,13 @@ app.get("/reportes/:id", async (req,res)=>{
 app.post("/reportes", async (req,res)=>{
 	let valores=req.body
 	valores["id"]=Number(valores["id"])
-	let data=await db.collection("ejemplo402").insertOne(valores);
+	let data=await db.collection("reportes").insertOne(valores);
 	res.json(data)
 });
 
 //deleteOne
 app.delete("/reportes/:id", async(req,res)=>{
-	let data=await db.collection("ejemplo402").deleteOne({"id": Number(req.params.id)});
+	let data=await db.collection("reportes").deleteOne({"id": Number(req.params.id)});
 	res.json(data)
 })
 
@@ -82,13 +84,13 @@ app.delete("/reportes/:id", async(req,res)=>{
 app.put("/reportes/:id", async(req,res)=>{
 	let valores=req.body
 	valores["id"]=Number(valores["id"])
-	let data =await db.collection("ejemplo402").updateOne({"id":valores["id"]}, {"$set":valores})
-	data=await db.collection("ejemplo402").find({"id":valores["id"]}).project({_id:0}).toArray();
+	let data =await db.collection("reportes").updateOne({"id":valores["id"]}, {"$set":valores})
+	data=await db.collection("reportes").find({"id":valores["id"]}).project({_id:0}).toArray();
 	res.json(data[0]);
 })
 
 async function connectToDB(){
-	let client=new MongoClient("mongodb://127.0.0.1:27017/tc2007b");
+	let client=new MongoClient(await process.env.DB);
 	await client.connect();
 	db=client.db();
 	console.log("conectado a la base de datos");
@@ -100,11 +102,11 @@ app.post("/registrarse", async(req, res)=>{
 	let pass=req.body.password;
 	let nombre=req.body.nombre;
 	let tipo=req.body.tipo;
-	let data=await db.collection("usuarios402").findOne({"usuario":user})
+	let data=await db.collection("usuarios").findOne({"usuario":user})
 	if(data==null){
 		const hash=await argon2.hash(pass, {type: argon2.argon2id, memoryCost: 19*1024, timeCost:2, parallelism:1, saltLength:16})
 		let usuarioAgregar={"usuario":user, "password":hash, "nombre":nombre, "tipo":tipo}
-		data=await db.collection("usuarios402").insertOne(usuarioAgregar);
+		data=await db.collection("usuarios").insertOne(usuarioAgregar);
 		res.sendStatus(201);
 	}else{
 		res.sendStatus(403)
@@ -114,18 +116,30 @@ app.post("/registrarse", async(req, res)=>{
 app.post("/login", async (req, res)=>{
 	let user=req.body.username;
 	let pass=req.body.password;
-	let data=await db.collection("usuarios402").findOne({"usuario":user});
+	let data=await db.collection("usuarios").findOne({"usuario":user});
 	if(data==null){
 		res.sendStatus(401);
 	}else if(await argon2.verify(data.password, pass)){
-		let token=jwt.sign({"usuario":data.usuario}, "secretKey", {expiresIn: 900})
+		let token=jwt.sign({"usuario":data.usuario}, await process.env.JWTKEY, {expiresIn: 900})
 		res.json({"token":token, "id":data.usuario, "nombre":data.nombre})
 	}else{
 		res.sendStatus(401);
 	}
 })
 
-app.listen(PORT, ()=>{
+const options = {
+      key: fs.readFileSync('backend.key'),
+      cert: fs.readFileSync('backend.crt')
+    };
+
+https.createServer(options, app).listen(3000, async () => {
+		await process.loadEnvFile(".env");
+		connectToDB();
+      	console.log('HTTPS Server running on port 3000');
+});
+
+/*app.listen(PORT, async ()=>{
+	await process.loadEnvFile(".env");
 	connectToDB();
 	console.log("aplicacion corriendo en puerto 3000");
-});
+});*/

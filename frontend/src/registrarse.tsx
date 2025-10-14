@@ -1,12 +1,14 @@
 import React, {useState, ChangeEvent} from 'react';
 
 const Registrarse: React.FC =()=>{
+    
     const [datos, setDatos]=useState({username:"", password:"",nombre:"", tipo:"paramedico"});
     
     const handleChange=(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>)=>{setDatos({...datos, [event.target.name]:event.target.value})} 
 
     const handleSendData=async ()=>{
-        const request=await new Request("http://127.0.0.1:3000/registrarse",{
+        console.log(import.meta.env.VITE_BACKEND)
+        const request=await new Request(import.meta.env.VITE_BACKEND+"/registrarse",{
             method: "POST",
             body: JSON.stringify(datos),
             headers: new Headers({"Content-Type": "application/json"})
@@ -25,19 +27,19 @@ const Registrarse: React.FC =()=>{
             <h2>Registro de nuevos usuarios</h2>
             <form>
                 <div>
-                    <label hmtlFor="username">Usuario: </label>
+                    <label>Usuario: </label>
                     <input type="text" id="username" name="username" value={datos.username}  onChange={handleChange} />
                 </div>
                 <div>
-                    <label hmtlFor="password">Password: </label>
+                    <label>Password: </label>
                     <input type="password" id="password" name="password" value={datos.password}  onChange={handleChange} />
                 </div>
                 <div>
-                    <label hmtlFor="nombre">Nombre Completo: </label>
+                    <label>Nombre Completo: </label>
                     <input type="text" id="nombre" name="nombre" value={datos.nombre}  onChange={handleChange} />
                 </div>
                 <div>
-                    <label hmtlFor="tipo">Tipo de usuario:</label>
+                    <label>Tipo de usuario:</label>
                     <select id="tipo" name="tipo" value={datos.tipo} onChange={handleChange}>
                         <option value="paramedico">Paramedico</option>
                         <option value="urbano">Respondiente de emergencias urbanas</option>

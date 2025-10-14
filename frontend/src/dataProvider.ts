@@ -11,4 +11,4 @@ const fetchJsonUtil=(url:string, options:fetchUtils.Options={})=>{
 };
 
 export const dataProvider = jsonServerProvider(
-  import.meta.env.VITE_JSON_SERVER_URL, fetchJsonUtil);
+  import.meta.env.VITE_BACKEND, fetchJsonUtil);
